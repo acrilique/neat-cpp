@@ -4,12 +4,16 @@
 #include <QImageReader>
 #include <QBuffer>
 #include <QGraphicsPixmapItem>
+#include <QGraphicsSvgItem>
+#include <QSvgRenderer>
+#include <QSvgGenerator>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QApplication>
 #include <QScreen>
 #include <QMessageBox>
+#include <QTemporaryFile>
 #include <cmath>
 
 ImagePresenter::ImagePresenter() : QMainWindow()
@@ -66,6 +70,7 @@ void ImagePresenter::setupUi()
 void ImagePresenter::setupVariables()
 {
     imageItem = nullptr;
+    svgItem = nullptr;
     currentPointIndex = -1;
     lastAccessedFolder = "";
     currentFilePath = "";
@@ -191,8 +196,8 @@ void ImagePresenter::loadImage()
     toggleHiding(false);
     QString initialDir = lastAccessedFolder.isEmpty() ? QDir::homePath() : lastAccessedFolder;
     QString filePath = QFileDialog::getOpenFileName(this, "Open Image or Presentation", initialDir,
-        "All Supported Files (*.bmp *.gif *.jpg *.jpeg *.png *.pbm *.pgm *.ppm *.xbm *.xpm *.neatp);;"
-        "Images (*.bmp *.gif *.jpg *.jpeg *.png *.pbm *.pgm *.ppm *.xbm *.xpm);;"
+        "All Supported Files (*.bmp *.gif *.jpg *.jpeg *.png *.pbm *.pgm *.ppm *.xbm *.xpm *.svg *.neatp);;"
+        "Images (*.bmp *.gif *.jpg *.jpeg *.png *.pbm *.pgm *.ppm *.xbm *.xpm *.svg);;"
         "Neat Presentation (*.neatp)");
     toggleHiding(true);
 
@@ -205,9 +210,13 @@ void ImagePresenter::loadFile(const QString& filePath)
 {
     lastAccessedFolder = QFileInfo(filePath).path();
     scene->clear();
+    imageItem = nullptr;
+    svgItem = nullptr;
     try {
         if (filePath.toLower().endsWith(".neatp")) {
             loadPresentation(filePath);
+        } else if (filePath.toLower().endsWith(".svg")) {
+            loadSvgFile(filePath);
         } else {
             loadImageFile(filePath);
         }
@@ -244,6 +253,25 @@ void ImagePresenter::loadImageFile(const QString& filePath)
     graphicsView->setInitialZoom();
 }
 
+void ImagePresenter::loadSvgFile(const QString& filePath)
+{
+    svgItem = new QGraphicsSvgItem(filePath);
+    if (svgItem->renderer()->isValid()) {
+        scene->addItem(svgItem);
+        QRectF bounds = svgItem->boundingRect();
+        scene->setSceneRect(bounds);
+        imageFormat = "svg";
+        presentationPoints.clear();
+        currentPointIndex = -1;
+        graphicsView->setOriginalImageSize(bounds.size().toSize());
+        graphicsView->setInitialZoom();
+    } else {
+        delete svgItem;
+        svgItem = nullptr;
+        throw std::runtime_error("Failed to load SVG file: " + filePath.toStdString());
+    }
+}
+
 void ImagePresenter::loadPresentation(const QString& filePath)
 {
     QFile file(filePath);
@@ -254,16 +282,28 @@ void ImagePresenter::loadPresentation(const QString& filePath)
     QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
     QJsonObject data = doc.object();
 
+    bool isSvg = data["is_svg"].toBool();
     QByteArray imageData = QByteArray::fromBase64(data["image_data"].toString().toUtf8());
     imageFormat = data["image_format"].toString();
 
-    QPixmap pixmap;
-    if (!pixmap.loadFromData(imageData, imageFormat.toUtf8().constData())) {
-        throw std::runtime_error("Failed to load image data from presentation file");
+    if (isSvg) {
+        QTemporaryFile tempFile;
+        if (tempFile.open()) {
+            tempFile.write(imageData);
+            tempFile.close();
+            loadSvgFile(tempFile.fileName());
+        } else {
+            throw std::runtime_error("Failed to create temporary file for SVG data");
+        }
+    } else {
+        QPixmap pixmap;
+        if (!pixmap.loadFromData(imageData, imageFormat.toUtf8().constData())) {
+            throw std::runtime_error("Failed to load image data from presentation file");
+        }
+        imageItem = scene->addPixmap(pixmap);
+        scene->setSceneRect(pixmap.rect());
+        graphicsView->setOriginalImageSize(pixmap.size());
     }
-    imageItem = scene->addPixmap(pixmap);
-    scene->setSceneRect(pixmap.rect());
-    graphicsView->setOriginalImageSize(pixmap.size());
 
     presentationPoints.clear();
     QJsonArray points = data["presentation_points"].toArray();
@@ -279,7 +319,7 @@ void ImagePresenter::loadPresentation(const QString& filePath)
 
 void ImagePresenter::savePresentation()
 {
-    if (!imageItem) {
+    if (!imageItem && !svgItem) {
         qWarning() << "No image loaded to save";
         return;
     }
@@ -301,6 +341,7 @@ void ImagePresenter::savePresentation()
     try {
         QByteArray imageData = encodeImageData();
         QJsonObject data;
+        data["is_svg"] = (imageFormat == "svg");
         data["image_format"] = imageFormat;
         data["image_data"] = QString::fromUtf8(imageData.toBase64());
 
@@ -338,7 +379,20 @@ QByteArray ImagePresenter::encodeImageData()
     QByteArray imageData;
     QBuffer buffer(&imageData);
     buffer.open(QIODevice::WriteOnly);
-    imageItem->pixmap().save(&buffer, imageFormat.toUtf8().constData());
+
+    if (svgItem) {
+        QSvgGenerator generator;
+        generator.setOutputDevice(&buffer);
+        generator.setSize(svgItem->boundingRect().size().toSize());
+        generator.setViewBox(svgItem->boundingRect());
+        QPainter painter;
+        painter.begin(&generator);
+        svgItem->paint(&painter, nullptr, nullptr);
+        painter.end();
+    } else if (imageItem) {
+        imageItem->pixmap().save(&buffer, imageFormat.toUtf8().constData());
+    }
+
     return imageData;
 }
 
@@ -383,7 +437,7 @@ void ImagePresenter::mouseMoveEvent(QMouseEvent* event)
 
 void ImagePresenter::setPresenterPoint()
 {
-    if (imageItem) {
+    if (imageItem || svgItem) {
         QPointF center = graphicsView->mapToScene(graphicsView->viewport()->rect().center());
         QPointF imageCoords = graphicsView->mapToImageCoordinates(center);
         qreal zoom = graphicsView->getZoom();
@@ -407,7 +461,7 @@ void ImagePresenter::previousPoint()
 
 void ImagePresenter::resetView()
 {
-    if (imageItem) {
+    if (imageItem || svgItem) {
         graphicsView->fitInView(scene->sceneRect(), Qt::KeepAspectRatio);
         updateStatusBar();
         qInfo() << "View reset";
@@ -417,7 +471,7 @@ void ImagePresenter::resetView()
 
 void ImagePresenter::updateStatusBar()
 {
-    if (imageItem) {
+    if (imageItem || svgItem) {
         QString status = QString("Points: %1 | Current: %2")
             .arg(presentationPoints.size())
             .arg(currentPointIndex >= 0 ? currentPointIndex + 1 : 0);

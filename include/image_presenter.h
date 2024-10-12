@@ -3,6 +3,7 @@
 
 #include <QMainWindow>
 #include <QGraphicsScene>
+#include <QGraphicsSvgItem>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QPushButton>
@@ -47,6 +48,7 @@ private:
     void toggleHiding(bool enable);
     void loadFile(const QString& filePath);
     void loadImageFile(const QString& filePath);
+    void loadSvgFile(const QString& filePath);
     void loadPresentation(const QString& filePath);
     QByteArray encodeImageData();
     void updateStatusBar();
@@ -69,6 +71,8 @@ private:
     QStatusBar* statusBar;
 
     QGraphicsPixmapItem* imageItem;
+    QGraphicsSvgItem* svgItem;
+
     std::vector<std::tuple<QPointF, qreal>> presentationPoints;
     int currentPointIndex;
     QString imageFormat;
