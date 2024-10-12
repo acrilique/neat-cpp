@@ -37,6 +37,7 @@ private:
     const double m_zoomFactor = 1.15;
     QSize m_originalImageSize;
     QSize m_currentViewSize;
+    QTransform m_currentTransform; // New member to store the current transform
 };
 
 #endif // CUSTOM_GRAPHICS_VIEW_H

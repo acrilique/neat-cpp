@@ -6,7 +6,7 @@
 #include <cmath>
 
 CustomGraphicsView::CustomGraphicsView(QWidget* parent)
-    : QGraphicsView(parent), m_currentZoom(1.0), m_originalImageSize(0, 0), m_currentViewSize(0, 0)
+    : QGraphicsView(parent), m_currentZoom(1.0), m_originalImageSize(0, 0), m_currentViewSize(0, 0), m_currentTransform()
 {
     setupGraphicsView();
 }
@@ -35,7 +35,8 @@ void CustomGraphicsView::setOriginalImageSize(const QSize& size)
 void CustomGraphicsView::setInitialZoom()
 {
     if (scene() && !scene()->items().isEmpty()) {
-        setTransform(QTransform());
+        m_currentTransform = QTransform();
+        setTransform(m_currentTransform);
         updateScaling();
         centerOn(scene()->sceneRect().center());
     }
@@ -50,9 +51,8 @@ void CustomGraphicsView::updateScaling()
 
         scale = qBound(m_minZoom, scale, m_maxZoom);
 
-        QTransform transform;
-        transform.scale(scale, scale);
-        setTransform(transform);
+        m_currentTransform = QTransform::fromScale(scale, scale);
+        setTransform(m_currentTransform);
 
         m_currentZoom = scale;
     }
@@ -62,7 +62,24 @@ void CustomGraphicsView::resizeEvent(QResizeEvent* event)
 {
     QGraphicsView::resizeEvent(event);
     m_currentViewSize = event->size();
-    updateScaling();
+    
+    // Preserve the current center point
+    QPointF centerPoint = mapToScene(viewport()->rect().center());
+    
+    // Update scaling while maintaining the current zoom level
+    qreal scaleX = static_cast<qreal>(m_currentViewSize.width()) / m_originalImageSize.width();
+    qreal scaleY = static_cast<qreal>(m_currentViewSize.height()) / m_originalImageSize.height();
+    qreal scale = qMin(scaleX, scaleY);
+    
+    // Apply the current zoom to the new scale
+    scale *= m_currentZoom;
+    
+    // Update the transform
+    m_currentTransform = QTransform::fromScale(scale, scale);
+    setTransform(m_currentTransform);
+    
+    // Center on the previous center point
+    centerOn(centerPoint);
 }
 
 QPointF CustomGraphicsView::mapToImageCoordinates(const QPointF& viewPoint) const
@@ -85,7 +102,8 @@ void CustomGraphicsView::setZoom(qreal zoom)
 {
     zoom = qBound(m_minZoom, zoom, m_maxZoom);
     qreal factor = zoom / m_currentZoom;
-    scale(factor, factor);
+    m_currentTransform.scale(factor, factor);
+    setTransform(m_currentTransform);
     m_currentZoom = zoom;
 }
 
@@ -110,7 +128,8 @@ void CustomGraphicsView::zoomView(double factor)
     newZoom = qBound(m_minZoom, newZoom, m_maxZoom);
     double actualFactor = newZoom / m_currentZoom;
     
-    scale(actualFactor, actualFactor);
+    m_currentTransform.scale(actualFactor, actualFactor);
+    setTransform(m_currentTransform);
     m_currentZoom = newZoom;
 }
 
