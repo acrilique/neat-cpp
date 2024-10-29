@@ -84,17 +84,19 @@ void CustomGraphicsView::resizeEvent(QResizeEvent* event)
 
 QPointF CustomGraphicsView::mapToImageCoordinates(const QPointF& viewPoint) const
 {
+    // Map the view point to scene coordinates
     QPointF scenePoint = mapToScene(viewPoint.toPoint());
-    qreal scaleX = static_cast<qreal>(m_originalImageSize.width()) / sceneRect().width();
-    qreal scaleY = static_cast<qreal>(m_originalImageSize.height()) / sceneRect().height();
-    return QPointF(scenePoint.x() * scaleX, scenePoint.y() * scaleY);
+    
+    // Convert scene coordinates to image coordinates by applying the inverse of the current transform
+    return scenePoint;
 }
 
 QPointF CustomGraphicsView::mapFromImageCoordinates(const QPointF& imagePoint) const
 {
-    qreal scaleX = static_cast<qreal>(m_originalImageSize.width()) / sceneRect().width();
-    qreal scaleY = static_cast<qreal>(m_originalImageSize.height()) / sceneRect().height();
-    QPointF scenePoint(imagePoint.x() / scaleX, imagePoint.y() / scaleY);
+    // Convert image coordinates to scene coordinates
+    QPointF scenePoint = imagePoint;
+    
+    // Map scene coordinates back to view coordinates
     return mapFromScene(scenePoint);
 }
 

@@ -306,17 +306,17 @@ void ImagePresenter::loadSvgFile(const QString& filePath)
         throw std::runtime_error("Failed to open SVG file: " + filePath.toStdString());
     }
 
-    QString svgContent = QString::fromUtf8(file.readAll());
+    QString content = QString::fromUtf8(file.readAll());
     file.close();
 
     // Transform nested SVG if needed
-    QString transformedContent = transformNestedSvg(svgContent);
+    svgContent = transformNestedSvg(content);
 
     // Create a temporary file for the transformed content
     QTemporaryFile tempFile;
     if (tempFile.open()) {
         QTextStream stream(&tempFile);
-        stream << transformedContent;
+        stream << svgContent;
         tempFile.close();
 
         svgItem = new QGraphicsSvgItem(tempFile.fileName());
@@ -448,14 +448,8 @@ QByteArray ImagePresenter::encodeImageData()
     buffer.open(QIODevice::WriteOnly);
 
     if (svgItem) {
-        QSvgGenerator generator;
-        generator.setOutputDevice(&buffer);
-        generator.setSize(svgItem->boundingRect().size().toSize());
-        generator.setViewBox(svgItem->boundingRect());
-        QPainter painter;
-        painter.begin(&generator);
-        svgItem->paint(&painter, nullptr, nullptr);
-        painter.end();
+        // Simply write the stored SVG content
+        buffer.write(svgContent.toUtf8());
     } else if (imageItem) {
         imageItem->pixmap().save(&buffer, imageFormat.toUtf8().constData());
     }
@@ -506,12 +500,11 @@ void ImagePresenter::setPresenterPoint()
 {
     if (imageItem || svgItem) {
         QPointF center = graphicsView->mapToScene(graphicsView->viewport()->rect().center());
-        QPointF imageCoords = graphicsView->mapToImageCoordinates(center);
         qreal zoom = graphicsView->getZoom();
-        presentationPoints.emplace_back(imageCoords, zoom);
+        presentationPoints.emplace_back(center, zoom);
         currentPointIndex = static_cast<int>(presentationPoints.size()) - 1;
         updateStatusBar();
-        qInfo() << "Presentation point set:" << imageCoords << "zoom:" << zoom;
+        qInfo() << "Presentation point set:" << center << "zoom:" << zoom;
         utils::log_session("Set presentation point: " + std::to_string(presentationPoints.size()));
     }
 }
@@ -548,17 +541,12 @@ void ImagePresenter::updateStatusBar()
 
 void ImagePresenter::navigateToPoint(const std::tuple<QPointF, qreal>& point)
 {
-    const auto& [imageCoords, zoom] = point;
-
-    // Check if the imageCoords is a valid point
-    if (imageCoords.isNull()) {
-        return;
-    }
+    const auto& [targetCenter, targetZoom] = point;
 
     QPointF startCenter = graphicsView->mapToScene(graphicsView->viewport()->rect().center());
-    QPointF endCenter = graphicsView->mapFromImageCoordinates(imageCoords);
     qreal startZoom = graphicsView->getZoom();
-    smoothNavigateToPoint(startCenter, endCenter, startZoom, zoom);
+
+    smoothNavigateToPoint(startCenter, targetCenter, startZoom, targetZoom);
     updateStatusBar();
 }
 
@@ -571,14 +559,18 @@ void ImagePresenter::smoothNavigateToPoint(const QPointF& startCenter, const QPo
 
     connect(animation, &QPropertyAnimation::valueChanged, this, [=](const QVariant& value) {
         qreal t = value.toReal();
+        
+        // Apply zoom and position changes together
+        graphicsView->setTransformationAnchor(QGraphicsView::AnchorViewCenter);
+        
+        // Calculate the current zoom and position
+        qreal currentZoom = (1 - t) * startZoom + t * endZoom;
         QPointF currentCenter(
             (1 - t) * startCenter.x() + t * endCenter.x(),
             (1 - t) * startCenter.y() + t * endCenter.y()
         );
-        qreal currentZoom = (1 - t) * startZoom + t * endZoom;
         
-        graphicsView->setTransformationAnchor(QGraphicsView::AnchorViewCenter);
-        graphicsView->setResizeAnchor(QGraphicsView::AnchorViewCenter);
+        // Set zoom and center in a single transform update
         graphicsView->setZoom(currentZoom);
         graphicsView->centerOn(currentCenter);
     });
@@ -590,9 +582,25 @@ void ImagePresenter::smoothNavigateToPoint(const QPointF& startCenter, const QPo
 
 void ImagePresenter::navigateToNextPoint(int direction)
 {
-    if (!presentationPoints.empty()) {
-        currentPointIndex = (currentPointIndex + direction + static_cast<int>(presentationPoints.size())) % static_cast<int>(presentationPoints.size());
-        navigateToPoint(presentationPoints[currentPointIndex]);
-        utils::log_session("Navigated to point: " + std::to_string(currentPointIndex + 1));
+    if (presentationPoints.empty()) {
+        return;
     }
+
+    int numPoints = static_cast<int>(presentationPoints.size());
+    
+    // If we're at -1 (no point selected) and going forward, go to first point
+    if (currentPointIndex == -1 && direction > 0) {
+        currentPointIndex = 0;
+    }
+    // If we're at -1 (no point selected) and going backward, go to last point
+    else if (currentPointIndex == -1 && direction < 0) {
+        currentPointIndex = numPoints - 1;
+    }
+    // Otherwise, move in the specified direction with wrapping
+    else {
+        currentPointIndex = (currentPointIndex + direction + numPoints) % numPoints;
+    }
+
+    navigateToPoint(presentationPoints[currentPointIndex]);
+    utils::log_session("Navigated to point: " + std::to_string(currentPointIndex + 1));
 }

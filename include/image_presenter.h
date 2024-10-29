@@ -73,6 +73,7 @@ private:
 
     QGraphicsPixmapItem* imageItem;
     QGraphicsSvgItem* svgItem;
+    QString svgContent;  // Added to store the original SVG content
 
     std::vector<std::tuple<QPointF, qreal>> presentationPoints;
     int currentPointIndex;
