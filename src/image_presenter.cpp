@@ -14,6 +14,7 @@
 #include <QScreen>
 #include <QMessageBox>
 #include <QTemporaryFile>
+#include <QDomDocument>
 #include <cmath>
 
 ImagePresenter::ImagePresenter() : QMainWindow()
@@ -91,6 +92,51 @@ void ImagePresenter::setupConnections()
     connect(recentFilesDropdown, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &ImagePresenter::loadRecentFile);
     connect(graphicsView, &CustomGraphicsView::mouseMoved, this, &ImagePresenter::onMouseMove);
     connect(hideTimer, &QTimer::timeout, this, &ImagePresenter::hideTopBarAndCursor);
+}
+
+QString ImagePresenter::transformNestedSvg(const QString& svgContent) {
+    QDomDocument doc;
+    if (!doc.setContent(svgContent)) {
+        return svgContent; // Return original if parsing fails
+    }
+
+    QDomElement root = doc.documentElement();
+    if (root.tagName().toLower() != "svg") {
+        return svgContent;
+    }
+
+    // Find all svg elements
+    QDomNodeList svgNodes = root.elementsByTagName("svg");
+
+    printf("SVG nodes: %d\n", svgNodes.length());
+    
+    // If we have exactly 2 SVG elements (root + one nested)
+    if (svgNodes.length() == 1) {
+        // The second node is our nested svg
+        QDomElement nestedSvg = svgNodes.at(0).toElement();
+        
+        // Create new g element
+        QDomElement gElement = doc.createElement("g");
+        
+        // Copy all attributes from svg to g
+        QDomNamedNodeMap attrs = nestedSvg.attributes();
+        for (int i = 0; i < attrs.length(); i++) {
+            QDomAttr attr = attrs.item(i).toAttr();
+            gElement.setAttribute(attr.name(), attr.value());
+        }
+        
+        // Move all children from nested svg to g
+        while (!nestedSvg.firstChild().isNull()) {
+            gElement.appendChild(nestedSvg.firstChild());
+        }
+        
+        // Replace nested svg with g
+        nestedSvg.parentNode().replaceChild(gElement, nestedSvg);
+        
+        return doc.toString();
+    }
+
+    return svgContent;
 }
 
 void ImagePresenter::toggleFullscreen()
@@ -255,20 +301,41 @@ void ImagePresenter::loadImageFile(const QString& filePath)
 
 void ImagePresenter::loadSvgFile(const QString& filePath)
 {
-    svgItem = new QGraphicsSvgItem(filePath);
-    if (svgItem->renderer()->isValid()) {
-        scene->addItem(svgItem);
-        QRectF bounds = svgItem->boundingRect();
-        scene->setSceneRect(bounds);
-        imageFormat = "svg";
-        presentationPoints.clear();
-        currentPointIndex = -1;
-        graphicsView->setOriginalImageSize(bounds.size().toSize());
-        graphicsView->setInitialZoom();
+    QFile file(filePath);
+    if (!file.open(QIODevice::ReadOnly)) {
+        throw std::runtime_error("Failed to open SVG file: " + filePath.toStdString());
+    }
+
+    QString svgContent = QString::fromUtf8(file.readAll());
+    file.close();
+
+    // Transform nested SVG if needed
+    QString transformedContent = transformNestedSvg(svgContent);
+
+    // Create a temporary file for the transformed content
+    QTemporaryFile tempFile;
+    if (tempFile.open()) {
+        QTextStream stream(&tempFile);
+        stream << transformedContent;
+        tempFile.close();
+
+        svgItem = new QGraphicsSvgItem(tempFile.fileName());
+        if (svgItem->renderer()->isValid()) {
+            scene->addItem(svgItem);
+            QRectF bounds = svgItem->boundingRect();
+            scene->setSceneRect(bounds);
+            imageFormat = "svg";
+            presentationPoints.clear();
+            currentPointIndex = -1;
+            graphicsView->setOriginalImageSize(bounds.size().toSize());
+            graphicsView->setInitialZoom();
+        } else {
+            delete svgItem;
+            svgItem = nullptr;
+            throw std::runtime_error("Failed to load SVG file: " + filePath.toStdString());
+        }
     } else {
-        delete svgItem;
-        svgItem = nullptr;
-        throw std::runtime_error("Failed to load SVG file: " + filePath.toStdString());
+        throw std::runtime_error("Failed to create temporary file for SVG transformation");
     }
 }
 

@@ -15,7 +15,7 @@ endif()
 set(CMAKE_CXX_FLAGS_DEBUG "-g -Wall -Wextra -O0")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
-find_package(Qt6 REQUIRED COMPONENTS Widgets Gui Core Svg SvgWidgets)
+find_package(Qt6 REQUIRED COMPONENTS Widgets Gui Core Svg SvgWidgets Xml)
 
 # Source files
 set(SOURCES
@@ -48,6 +48,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     Qt6::Core
     Qt6::Svg
     Qt6::SvgWidgets
+    Qt6::Xml
     stdc++fs
 )
 

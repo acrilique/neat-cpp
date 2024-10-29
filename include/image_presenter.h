@@ -55,6 +55,7 @@ private:
     void navigateToPoint(const std::tuple<QPointF, qreal>& point);
     void smoothNavigateToPoint(const QPointF& startCenter, const QPointF& endCenter, qreal startZoom, qreal endZoom);
     void navigateToNextPoint(int direction);
+    QString transformNestedSvg(const QString& svgContent);
 
     QWidget* centralWidget;
     QVBoxLayout* layout;
