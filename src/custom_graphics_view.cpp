@@ -45,10 +45,13 @@ void CustomGraphicsView::setInitialZoom()
 void CustomGraphicsView::updateScaling()
 {
     if (m_originalImageSize.isValid() && !m_currentViewSize.isEmpty()) {
+        // Calculate scale ratios for both width and height
         qreal scaleX = static_cast<qreal>(m_currentViewSize.width()) / m_originalImageSize.width();
         qreal scaleY = static_cast<qreal>(m_currentViewSize.height()) / m_originalImageSize.height();
+        
+        // Use the smaller scale to ensure image fits in both dimensions
         qreal scale = qMin(scaleX, scaleY);
-
+        
         scale = qBound(m_minZoom, scale, m_maxZoom);
 
         m_currentTransform = QTransform::fromScale(scale, scale);

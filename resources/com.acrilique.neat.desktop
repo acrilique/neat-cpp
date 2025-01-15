@@ -1,0 +1,12 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Neat
+Comment=Image Presentation Tool
+Exec=neat %f
+Icon=com.acrilique.neat
+Categories=Graphics;Viewer;Qt;
+MimeType=image/jpeg;image/png;image/gif;image/bmp;image/svg+xml;
+Keywords=Image;Picture;Photo;Viewer;SVG;
+StartupNotify=true
+Terminal=false

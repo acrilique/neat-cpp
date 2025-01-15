@@ -22,8 +22,10 @@ ImagePresenter::ImagePresenter() : QMainWindow()
     setupUi();
     setupVariables();
     setupConnections();
-    loadLastState();
     updateWindowTitle();
+    
+    show();
+    loadLastState();
 }
 
 void ImagePresenter::setupUi()
@@ -267,7 +269,6 @@ void ImagePresenter::loadFile(const QString& filePath)
             loadImageFile(filePath);
         }
 
-        graphicsView->fitInView(scene->sceneRect(), Qt::KeepAspectRatio);
         graphicsView->setInitialZoom();
         updateStatusBar();
         qInfo() << "Image/Presentation loaded:" << filePath;
@@ -296,7 +297,6 @@ void ImagePresenter::loadImageFile(const QString& filePath)
     presentationPoints.clear();
     currentPointIndex = -1;
     graphicsView->setOriginalImageSize(pixmap.size());
-    graphicsView->setInitialZoom();
 }
 
 void ImagePresenter::loadSvgFile(const QString& filePath)
@@ -328,7 +328,6 @@ void ImagePresenter::loadSvgFile(const QString& filePath)
             presentationPoints.clear();
             currentPointIndex = -1;
             graphicsView->setOriginalImageSize(bounds.size().toSize());
-            graphicsView->setInitialZoom();
         } else {
             delete svgItem;
             svgItem = nullptr;
@@ -381,7 +380,6 @@ void ImagePresenter::loadPresentation(const QString& filePath)
         presentationPoints.emplace_back(point, zoom);
     }
     currentPointIndex = -1;
-    graphicsView->setInitialZoom();
 }
 
 void ImagePresenter::savePresentation()

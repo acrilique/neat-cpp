@@ -2,9 +2,19 @@ cmake_minimum_required(VERSION 3.24)
 project(neat LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
+
+# RPATH settings for Flatpak
+set(CMAKE_SKIP_BUILD_RPATH FALSE)
+set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
+set(CMAKE_INSTALL_RPATH "$ORIGIN:$ORIGIN/lib:$ORIGIN/../../lib")
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+
+# Make sure plugins can find Qt libraries
+set(CMAKE_BUILD_RPATH_USE_ORIGIN TRUE)
 
 # Set default build type to Release
 if(NOT CMAKE_BUILD_TYPE)
@@ -35,8 +45,10 @@ set(HEADERS
     # ${CMAKE_SOURCE_DIR}/include/input_device_detector.h
 )
 
+qt_standard_project_setup()
+
 # Add executable
-add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
+qt_add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
 
 # Include directories
 target_include_directories(${PROJECT_NAME} PRIVATE include)
@@ -49,20 +61,53 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     Qt6::Svg
     Qt6::SvgWidgets
     Qt6::Xml
-    stdc++fs
 )
-
-qt_standard_project_setup()
 
 # Install target
 install(TARGETS ${PROJECT_NAME}
-    RUNTIME DESTINATION bin
+BUNDLE  DESTINATION .
+RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
 
-# Copy icon file to build directory
-configure_file(${CMAKE_SOURCE_DIR}/resources/icon.png ${CMAKE_BINARY_DIR}/icon.png COPYONLY)
-
-# Install icon file
-install(FILES ${CMAKE_SOURCE_DIR}/resources/icon.png
-    DESTINATION share/${PROJECT_NAME}
+# Install icon files
+install(FILES ${CMAKE_SOURCE_DIR}/resources/com.acrilique.neat-512x512.png
+    DESTINATION share/icons/hicolor/512x512/apps
+    RENAME com.acrilique.neat.png
 )
+
+# Install downscaled icons
+install(FILES ${CMAKE_SOURCE_DIR}/resources/com.acrilique.neat-16x16.png
+    DESTINATION share/icons/hicolor/16x16/apps
+    RENAME com.acrilique.neat.png
+)
+install(FILES ${CMAKE_SOURCE_DIR}/resources/com.acrilique.neat-24x24.png
+    DESTINATION share/icons/hicolor/24x24/apps
+    RENAME com.acrilique.neat.png
+)
+install(FILES ${CMAKE_SOURCE_DIR}/resources/com.acrilique.neat-32x32.png
+    DESTINATION share/icons/hicolor/32x32/apps
+    RENAME com.acrilique.neat.png
+)
+install(FILES ${CMAKE_SOURCE_DIR}/resources/com.acrilique.neat-48x48.png
+    DESTINATION share/icons/hicolor/48x48/apps
+    RENAME com.acrilique.neat.png
+)
+install(FILES ${CMAKE_SOURCE_DIR}/resources/com.acrilique.neat-64x64.png
+    DESTINATION share/icons/hicolor/64x64/apps
+    RENAME com.acrilique.neat.png
+)
+install(FILES ${CMAKE_SOURCE_DIR}/resources/com.acrilique.neat-128x128.png
+    DESTINATION share/icons/hicolor/128x128/apps
+    RENAME com.acrilique.neat.png
+)
+install(FILES ${CMAKE_SOURCE_DIR}/resources/com.acrilique.neat-256x256.png
+    DESTINATION share/icons/hicolor/256x256/apps
+    RENAME com.acrilique.neat.png
+)
+
+# Install desktop file
+install(FILES ${CMAKE_SOURCE_DIR}/resources/com.acrilique.neat.desktop
+    DESTINATION share/applications
+)
+
+# Let Flatpak handle Qt plugin deployment
