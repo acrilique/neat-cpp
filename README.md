@@ -4,6 +4,8 @@ Welcome to **neat**, a C++ port of the original Python-based `neat-present` imag
 
 **Linux only**, at least for now.
 
+[Download the latest flatpak release.](https://github.com/acrilique/neat-cpp/releases/download/v0.1.0/neat.flatpak)
+
 ## Purpose
 
 Take an image and make a presentation out of it. Useful for diagrams, flowcharts, etc. The output file format of the app (.neatp) is a JSON file with the image base64 encoded and the coordinates of the points for the presentation.
