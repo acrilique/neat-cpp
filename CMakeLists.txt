@@ -33,7 +33,6 @@ set(SOURCES
     ${CMAKE_SOURCE_DIR}/src/image_presenter.cpp
     ${CMAKE_SOURCE_DIR}/src/custom_graphics_view.cpp
     ${CMAKE_SOURCE_DIR}/src/utils.cpp
-    # ${CMAKE_SOURCE_DIR}/src/input_device_detector.cpp
 )
 
 # Header files
@@ -42,7 +41,6 @@ set(HEADERS
     ${CMAKE_SOURCE_DIR}/include/custom_graphics_view.h
     ${CMAKE_SOURCE_DIR}/include/utils.h
     ${CMAKE_SOURCE_DIR}/include/json.hpp
-    # ${CMAKE_SOURCE_DIR}/include/input_device_detector.h
 )
 
 qt_standard_project_setup()
